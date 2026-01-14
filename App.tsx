@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { SelectionGroup } from './components/SelectionGroup';
-import { ResponseType, Channel, ToneManner, GenerationResult, RequestConfig } from './types';
+import { ResponseType, Channel, ToneManner, EndingStyle, GenerationResult, RequestConfig } from './types';
 import { generateReviewResponse } from './geminiService';
 
 export default function App() {
@@ -11,6 +11,7 @@ export default function App() {
   const [responseType, setResponseType] = useState<ResponseType>(ResponseType.POSITIVE);
   const [channel, setChannel] = useState<Channel>(Channel.NAVER_PLACE);
   const [tone, setTone] = useState<ToneManner>(ToneManner.WARM);
+  const [endingStyle, setEndingStyle] = useState<EndingStyle>(EndingStyle.FORMAL);
   const [content, setContent] = useState('');
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageData, setImageData] = useState<string | undefined>();
@@ -58,9 +59,10 @@ export default function App() {
         responseType, 
         channel, 
         tone, 
+        endingStyle,
         content, 
         imageData,
-        hospitalName // Pass hospital name to service
+        hospitalName
       };
       const data = await generateReviewResponse(config);
       setResult(data);
@@ -119,7 +121,7 @@ export default function App() {
             <div className="space-y-6">
               <div className="flex items-center gap-3">
                 <span className="flex items-center justify-center w-6 h-6 rounded-full bg-amber-100 text-[#5d4037] text-xs font-bold">1</span>
-                <h3 className="font-bold text-slate-800">치과 정보 설정</h3>
+                <h3 className="font-bold text-slate-800">치과 정보 및 응대 성향 설정</h3>
               </div>
               
               <div className="space-y-3">
@@ -152,6 +154,15 @@ export default function App() {
                   options={Object.values(ToneManner) as ToneManner[]} 
                   selected={tone} 
                   onChange={setTone} 
+                />
+              </div>
+
+              <div className="pt-2">
+                <SelectionGroup<EndingStyle> 
+                  label="커뮤니케이션 톤 (종결 어미)" 
+                  options={Object.values(EndingStyle) as EndingStyle[]} 
+                  selected={endingStyle} 
+                  onChange={setEndingStyle} 
                 />
               </div>
             </div>
