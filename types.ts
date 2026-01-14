@@ -20,6 +20,11 @@ export enum ToneManner {
   SIMPLICITY = '간결함'
 }
 
+export enum EndingStyle {
+  SOFT = '~에요',
+  FORMAL = '~입니다'
+}
+
 export interface GenerationResult {
   title: string;
   body: string;
@@ -30,6 +35,7 @@ export interface RequestConfig {
   responseType: ResponseType;
   channel: Channel;
   tone: ToneManner;
+  endingStyle: EndingStyle;
   content: string;
   imageData?: string; // base64
   hospitalName: string;
