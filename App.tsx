@@ -135,19 +135,13 @@ export default function App() {
                 />
               </div>
 
-              <SelectionGroup<ResponseType> 
-                label="리뷰 성격" 
-                options={Object.values(ResponseType) as ResponseType[]} 
-                selected={responseType} 
-                onChange={setResponseType} 
-              />
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
-                <SelectionGroup<Channel> 
-                  label="게시 채널" 
-                  options={Object.values(Channel) as Channel[]} 
-                  selected={channel} 
-                  onChange={setChannel} 
+              {/* 요청하신 배치: 리뷰 성격 옆에 대응 톤앤매너 */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <SelectionGroup<ResponseType> 
+                  label="리뷰 성격" 
+                  options={Object.values(ResponseType) as ResponseType[]} 
+                  selected={responseType} 
+                  onChange={setResponseType} 
                 />
                 <SelectionGroup<ToneManner> 
                   label="대응 톤앤매너" 
@@ -157,7 +151,14 @@ export default function App() {
                 />
               </div>
 
-              <div className="pt-2">
+              {/* 요청하신 배치: 게시 채널 옆에 커뮤니케이션 톤 (대응 톤앤매너 밑에 위치하도록) */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <SelectionGroup<Channel> 
+                  label="게시 채널" 
+                  options={Object.values(Channel) as Channel[]} 
+                  selected={channel} 
+                  onChange={setChannel} 
+                />
                 <SelectionGroup<EndingStyle> 
                   label="커뮤니케이션 톤 (종결 어미)" 
                   options={Object.values(EndingStyle) as EndingStyle[]} 
