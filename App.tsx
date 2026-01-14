@@ -23,9 +23,8 @@ export default function App() {
     localStorage.setItem('hospital_name', hospitalName);
   }, [hospitalName]);
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
+  const processFile = (file: File) => {
+    if (file && file.type.startsWith('image/')) {
       const reader = new FileReader();
       reader.onloadend = () => {
         const fullBase64 = reader.result as string;
@@ -33,6 +32,29 @@ export default function App() {
         setImageData(fullBase64.split(',')[1]);
       };
       reader.readAsDataURL(file);
+    }
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      processFile(file);
+    }
+  };
+
+  const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const items = e.clipboardData?.items;
+    if (items) {
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.indexOf('image') !== -1) {
+          const file = items[i].getAsFile();
+          if (file) {
+            processFile(file);
+            // 텍스트 영역에 파일명이 적히는 등의 현상을 방지하고 싶다면 e.preventDefault()를 쓸 수 있지만,
+            // 보통 텍스트와 이미지를 동시에 붙여넣는 경우도 있으므로 여기서는 파일만 추출합니다.
+          }
+        }
+      }
     }
   };
 
@@ -135,7 +157,6 @@ export default function App() {
                 />
               </div>
 
-              {/* 요청하신 배치: 리뷰 성격 옆에 대응 톤앤매너 */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <SelectionGroup<ResponseType> 
                   label="리뷰 성격" 
@@ -151,7 +172,6 @@ export default function App() {
                 />
               </div>
 
-              {/* 요청하신 배치: 게시 채널 옆에 커뮤니케이션 톤 (대응 톤앤매너 밑에 위치하도록) */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <SelectionGroup<Channel> 
                   label="게시 채널" 
@@ -180,7 +200,8 @@ export default function App() {
                 <textarea
                   value={content}
                   onChange={(e) => setContent(e.target.value)}
-                  placeholder="리뷰 내용을 입력하거나 캡처 사진을 업로드해 주세요..."
+                  onPaste={handlePaste}
+                  placeholder="리뷰 내용을 입력하거나 사진을 복사해서 붙여넣어주세요..."
                   className="w-full min-h-[180px] p-6 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-amber-400 focus:bg-white transition-all outline-none text-slate-700 leading-relaxed placeholder:text-slate-400"
                 />
                 
@@ -196,7 +217,7 @@ export default function App() {
                       </button>
                     </div>
                   )}
-                  <label className="cursor-pointer p-3 bg-white rounded-xl shadow-sm border border-slate-200 hover:border-amber-300 hover:text-[#5d4037] transition-all active:scale-95">
+                  <label className="cursor-pointer p-3 bg-white rounded-xl shadow-sm border border-slate-200 hover:border-amber-300 hover:text-[#5d4037] transition-all active:scale-95" title="이미지 업로드">
                     <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} />
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
@@ -205,6 +226,7 @@ export default function App() {
                   </label>
                 </div>
               </div>
+              <p className="text-[11px] text-slate-400 text-center">이미지를 복사(Ctrl+C)한 후 위 입력창에 붙여넣기(Ctrl+V) 하셔도 첨부됩니다.</p>
             </div>
 
             <button
