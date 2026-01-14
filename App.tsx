@@ -5,6 +5,9 @@ import { ResponseType, Channel, ToneManner, GenerationResult, RequestConfig } fr
 import { generateReviewResponse } from './geminiService';
 
 export default function App() {
+  const [hospitalName, setHospitalName] = useState(() => {
+    return localStorage.getItem('hospital_name') || '';
+  });
   const [responseType, setResponseType] = useState<ResponseType>(ResponseType.POSITIVE);
   const [channel, setChannel] = useState<Channel>(Channel.NAVER_PLACE);
   const [tone, setTone] = useState<ToneManner>(ToneManner.WARM);
@@ -14,6 +17,10 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<GenerationResult | null>(null);
   const [copyStatus, setCopyStatus] = useState('복사하기');
+
+  useEffect(() => {
+    localStorage.setItem('hospital_name', hospitalName);
+  }, [hospitalName]);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -34,6 +41,10 @@ export default function App() {
   };
 
   const handleGenerate = async () => {
+    if (!hospitalName.trim()) {
+      alert('치과명을 입력해 주세요.');
+      return;
+    }
     if (!content && !imageData) {
       alert('리뷰 내용이나 사진을 제공해주세요.');
       return;
@@ -43,7 +54,14 @@ export default function App() {
     setResult(null);
 
     try {
-      const config: RequestConfig = { responseType, channel, tone, content, imageData };
+      const config: RequestConfig = { 
+        responseType, 
+        channel, 
+        tone, 
+        content, 
+        imageData,
+        hospitalName // Pass hospital name to service
+      };
       const data = await generateReviewResponse(config);
       setResult(data);
       window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
@@ -66,7 +84,6 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 selection:bg-indigo-100 pb-10">
-      {/* Top Navigation Bar */}
       <nav className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-slate-200 px-4 sm:px-6 py-3">
         <div className="max-w-5xl mx-auto flex justify-between items-center gap-2">
           <div className="flex items-center gap-3 shrink-0">
@@ -102,9 +119,20 @@ export default function App() {
             <div className="space-y-6">
               <div className="flex items-center gap-3">
                 <span className="flex items-center justify-center w-6 h-6 rounded-full bg-amber-100 text-[#5d4037] text-xs font-bold">1</span>
-                <h3 className="font-bold text-slate-800">응대 맥락 설정</h3>
+                <h3 className="font-bold text-slate-800">치과 정보 설정</h3>
               </div>
               
+              <div className="space-y-3">
+                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider pl-1">치과명 (자동 저장됨)</h3>
+                <input 
+                  type="text"
+                  value={hospitalName}
+                  onChange={(e) => setHospitalName(e.target.value)}
+                  placeholder="예: 같이가치치과"
+                  className="w-full px-5 py-3 rounded-xl bg-slate-50 border-2 border-slate-100 focus:border-amber-400 focus:bg-white transition-all outline-none font-bold text-slate-700"
+                />
+              </div>
+
               <SelectionGroup<ResponseType> 
                 label="리뷰 성격" 
                 options={Object.values(ResponseType) as ResponseType[]} 
@@ -239,7 +267,6 @@ export default function App() {
           </section>
         )}
 
-        {/* Footer Section */}
         <footer className="pt-20 pb-10 text-center space-y-6">
           <div className="space-y-2">
             <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">CREATED BY</p>
