@@ -32,4 +32,5 @@ export interface RequestConfig {
   tone: ToneManner;
   content: string;
   imageData?: string; // base64
+  hospitalName: string;
 }
