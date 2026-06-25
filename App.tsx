@@ -7,6 +7,41 @@ import { generateReviewResponse } from './geminiService';
 const MAX_IMAGE_SIZE_MB = 5;
 const MAX_IMAGE_SIZE_BYTES = MAX_IMAGE_SIZE_MB * 1024 * 1024;
 
+type RiskRule = {
+  phrase: string;
+  category: string;
+  guidance: string;
+};
+
+const RISK_RULES: RiskRule[] = [
+  { phrase: '완치', category: '치료 결과 보장', guidance: '치료 결과를 단정하지 말고 개선 가능성이나 진료 계획 중심으로 바꿔주세요.' },
+  { phrase: '100%', category: '치료 결과 보장', guidance: '절대적 수치 표현은 피하고 개별 상태에 따라 달라질 수 있음을 남겨주세요.' },
+  { phrase: '무조건', category: '치료 결과 보장', guidance: '환자 상태에 따라 달라질 수 있는 표현으로 완화해주세요.' },
+  { phrase: '반드시 효과', category: '치료 결과 보장', guidance: '효과 보장 대신 진료 원칙과 확인 절차를 설명해주세요.' },
+  { phrase: '보장', category: '치료 결과 보장', guidance: '결과 보장으로 읽힐 수 있어 확인/관리/노력 표현으로 바꿔주세요.' },
+  { phrase: '재발 없음', category: '치료 결과 보장', guidance: '재발 가능성을 단정하지 말고 정기 관리의 중요성을 안내해주세요.' },
+  { phrase: '최고', category: '최상급 표현', guidance: '객관적 근거 없는 최상급 표현은 피하고 병원의 진료 태도를 설명해주세요.' },
+  { phrase: '유일', category: '최상급 표현', guidance: '독점적 표현은 객관적 근거가 없으면 삭제하거나 완화해주세요.' },
+  { phrase: '1위', category: '최상급 표현', guidance: '순위 표현은 공식 근거가 없으면 사용하지 않는 편이 안전합니다.' },
+  { phrase: '가장 잘하는', category: '최상급 표현', guidance: '비교 우위 표현 대신 성실한 진료 경험을 강조해주세요.' },
+  { phrase: '완벽', category: '과장 표현', guidance: '완벽을 약속하는 표현은 피하고 꼼꼼함, 세심함 같은 과정 표현으로 바꿔주세요.' },
+  { phrase: '통증 없이', category: '무통/부작용 단정', guidance: '통증 여부를 단정하지 말고 통증을 줄이기 위해 노력한다는 표현으로 바꿔주세요.' },
+  { phrase: '전혀 아프지', category: '무통/부작용 단정', guidance: '무통을 단정하지 말고 개인차가 있음을 전제로 완화해주세요.' },
+  { phrase: '무통', category: '무통/부작용 단정', guidance: '무통 표현은 통증 관리 또는 통증 완화 노력으로 바꿔주세요.' },
+  { phrase: '부작용 없음', category: '무통/부작용 단정', guidance: '부작용이 없다고 단정하지 말고 충분한 설명과 확인 절차를 안내해주세요.' },
+  { phrase: '타 병원보다', category: '비교 표현', guidance: '다른 병원과 직접 비교하는 표현은 피하고 자체 진료 원칙을 설명해주세요.' },
+  { phrase: '다른 곳보다', category: '비교 표현', guidance: '비교 표현 대신 병원이 중요하게 여기는 기준을 설명해주세요.' },
+];
+
+const findRiskyPhrases = (text: string) => {
+  const normalizedText = text.toLowerCase();
+  const matched = RISK_RULES.filter((rule) => normalizedText.includes(rule.phrase.toLowerCase()));
+
+  return matched.filter((rule, index, rules) => {
+    return rules.findIndex((item) => item.phrase === rule.phrase) === index;
+  });
+};
+
 export default function App() {
   const [hospitalName, setHospitalName] = useState(() => {
     return localStorage.getItem('hospital_name') || '';
@@ -22,6 +57,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<GenerationResult | null>(null);
   const [copyStatus, setCopyStatus] = useState('복사하기');
+  const riskMatches = result ? findRiskyPhrases(result.body) : [];
 
   useEffect(() => {
     localStorage.setItem('hospital_name', hospitalName);
@@ -114,6 +150,11 @@ export default function App() {
 
   const copyToClipboard = () => {
     if (!result) return;
+    if (riskMatches.length > 0) {
+      const shouldCopy = window.confirm('위험 표현이 감지되었습니다. 의료진 검수 후 복사하시겠습니까?');
+      if (!shouldCopy) return;
+    }
+
     const text = result.body;
     navigator.clipboard.writeText(text).then(() => {
       setCopyStatus('복사 완료');
@@ -294,6 +335,60 @@ export default function App() {
             </div>
 
             <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-8 space-y-8">
+              <div className={`rounded-2xl border p-5 ${
+                riskMatches.length > 0
+                  ? 'bg-rose-50 border-rose-200'
+                  : 'bg-emerald-50 border-emerald-200'
+              }`}>
+                <div className="flex items-start gap-3">
+                  <div className={`shrink-0 mt-0.5 rounded-full p-1 ${
+                    riskMatches.length > 0 ? 'bg-rose-600' : 'bg-emerald-600'
+                  }`}>
+                    {riskMatches.length > 0 ? (
+                      <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                      </svg>
+                    ) : (
+                      <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1 space-y-3">
+                    <div>
+                      <h4 className={`text-sm font-extrabold ${
+                        riskMatches.length > 0 ? 'text-rose-800' : 'text-emerald-800'
+                      }`}>
+                        {riskMatches.length > 0 ? `위험 표현 ${riskMatches.length}개 감지` : '위험 표현 미검출'}
+                      </h4>
+                      <p className={`mt-1 text-xs leading-relaxed ${
+                        riskMatches.length > 0 ? 'text-rose-700' : 'text-emerald-700'
+                      }`}>
+                        {riskMatches.length > 0
+                          ? '게시 전 아래 표현을 의료광고·과장 표현 관점에서 수정하거나 의료진 검수를 거쳐주세요.'
+                          : '기본 위험 문구 목록에서는 감지된 표현이 없습니다. 게시 전 최종 의료진 검수는 필요합니다.'}
+                      </p>
+                    </div>
+
+                    {riskMatches.length > 0 && (
+                      <div className="space-y-2">
+                        {riskMatches.map((risk) => (
+                          <div key={risk.phrase} className="rounded-xl bg-white/80 border border-rose-100 p-3">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[11px] font-bold text-rose-700">
+                                {risk.category}
+                              </span>
+                              <span className="text-sm font-extrabold text-slate-800">"{risk.phrase}"</span>
+                            </div>
+                            <p className="mt-1 text-xs leading-relaxed text-slate-600">{risk.guidance}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
               <div className="space-y-3">
                 <span className="text-xs font-bold text-amber-600 uppercase tracking-widest">대응 답변 본문 (헤드라인 포함)</span>
                 <div className="p-6 rounded-2xl bg-amber-50/20 text-slate-700 leading-relaxed whitespace-pre-wrap border border-amber-100/30 text-lg">
