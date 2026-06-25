@@ -21,6 +21,26 @@ const isGenerationResult = (value: unknown): value is GenerationResult => {
 
 const getBase64Size = (base64: string) => Buffer.byteLength(base64, "base64");
 
+const getFriendlyGeminiErrorMessage = (error: unknown) => {
+  const message = error instanceof Error ? error.message : String(error);
+  const lowerMessage = message.toLowerCase();
+
+  if (
+    lowerMessage.includes("429") ||
+    lowerMessage.includes("resource_exhausted") ||
+    lowerMessage.includes("quota") ||
+    lowerMessage.includes("rate limit")
+  ) {
+    return "요청이 잠시 많아 답변을 생성하지 못했습니다. 잠시 후 다시 시도해주세요.";
+  }
+
+  if (lowerMessage.includes("deadline") || lowerMessage.includes("timeout") || lowerMessage.includes("timed out")) {
+    return "이미지 분석 시간이 길어져 답변을 생성하지 못했습니다. 이미지를 다시 첨부하거나 리뷰 텍스트를 함께 입력해주세요.";
+  }
+
+  return "답변 생성 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.";
+};
+
 export const generateReviewResponseOnServer = async (
   config: RequestConfig,
   apiKey: string | undefined
@@ -75,34 +95,41 @@ export const generateReviewResponseOnServer = async (
     6. 결과물은 반드시 JSON 형식으로 제공하세요.
   `;
 
-  const response = await ai.models.generateContent({
-    model: "gemini-3-flash-preview",
-    contents: config.imageData
-      ? {
-          parts: [
-            { text: prompt },
-            {
-              inlineData: {
-                mimeType: config.imageMimeType,
-                data: config.imageData,
+  let response;
+
+  try {
+    response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: config.imageData
+        ? {
+            parts: [
+              { text: prompt },
+              {
+                inlineData: {
+                  mimeType: config.imageMimeType,
+                  data: config.imageData,
+                },
               },
-            },
-          ],
-        }
-      : prompt,
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          title: { type: Type.STRING, description: "답변의 핵심 요약" },
-          body: { type: Type.STRING, description: "전체 답변 내용" },
-          caution: { type: Type.STRING, description: "사용 시 주의사항" },
+            ],
+          }
+        : prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            title: { type: Type.STRING, description: "답변의 핵심 요약" },
+            body: { type: Type.STRING, description: "전체 답변 내용" },
+            caution: { type: Type.STRING, description: "사용 시 주의사항" },
+          },
+          required: ["title", "body", "caution"],
         },
-        required: ["title", "body", "caution"],
       },
-    },
-  });
+    });
+  } catch (error) {
+    console.error("[reviewGenerator] Gemini request failed", error);
+    throw new Error(getFriendlyGeminiErrorMessage(error));
+  }
 
   console.log("[reviewGenerator] Gemini response received", {
     hasText: Boolean(response.text),
