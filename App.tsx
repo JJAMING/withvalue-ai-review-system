@@ -4,6 +4,9 @@ import { SelectionGroup } from './components/SelectionGroup';
 import { ResponseType, Channel, ToneManner, EndingStyle, GenerationResult, RequestConfig } from './types';
 import { generateReviewResponse } from './geminiService';
 
+const MAX_IMAGE_SIZE_MB = 5;
+const MAX_IMAGE_SIZE_BYTES = MAX_IMAGE_SIZE_MB * 1024 * 1024;
+
 export default function App() {
   const [hospitalName, setHospitalName] = useState(() => {
     return localStorage.getItem('hospital_name') || '';
@@ -15,6 +18,7 @@ export default function App() {
   const [content, setContent] = useState('');
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageData, setImageData] = useState<string | undefined>();
+  const [imageMimeType, setImageMimeType] = useState<string | undefined>();
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<GenerationResult | null>(null);
   const [copyStatus, setCopyStatus] = useState('복사하기');
@@ -24,15 +28,24 @@ export default function App() {
   }, [hospitalName]);
 
   const processFile = (file: File) => {
-    if (file && file.type.startsWith('image/')) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const fullBase64 = reader.result as string;
-        setImagePreview(fullBase64);
-        setImageData(fullBase64.split(',')[1]);
-      };
-      reader.readAsDataURL(file);
+    if (!file.type.startsWith('image/')) {
+      alert('이미지 파일만 첨부할 수 있습니다.');
+      return;
     }
+
+    if (file.size > MAX_IMAGE_SIZE_BYTES) {
+      alert(`이미지는 ${MAX_IMAGE_SIZE_MB}MB 이하만 첨부할 수 있습니다.`);
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const fullBase64 = reader.result as string;
+      setImagePreview(fullBase64);
+      setImageData(fullBase64.split(',')[1]);
+      setImageMimeType(file.type);
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -61,6 +74,7 @@ export default function App() {
   const removeImage = () => {
     setImagePreview(null);
     setImageData(undefined);
+    setImageMimeType(undefined);
   };
 
   const handleGenerate = async () => {
@@ -84,6 +98,7 @@ export default function App() {
         endingStyle,
         content, 
         imageData,
+        imageMimeType,
         hospitalName
       };
       const data = await generateReviewResponse(config);
@@ -91,7 +106,7 @@ export default function App() {
       window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
     } catch (error) {
       console.error(error);
-      alert('답변 생성 중 오류가 발생했습니다.');
+      alert(error instanceof Error ? error.message : '답변 생성 중 오류가 발생했습니다.');
     } finally {
       setLoading(false);
     }

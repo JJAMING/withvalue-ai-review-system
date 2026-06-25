@@ -38,5 +38,6 @@ export interface RequestConfig {
   endingStyle: EndingStyle;
   content: string;
   imageData?: string; // base64
+  imageMimeType?: string;
   hospitalName: string;
 }
