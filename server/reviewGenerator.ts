@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { GenerationResult, RequestConfig } from "../types";
+import { GenerationResult, RequestConfig } from "../types.js";
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 

@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "http";
-import { generateReviewResponseOnServer } from "../server/reviewGenerator";
-import { RequestConfig } from "../types";
+import { generateReviewResponseOnServer } from "../server/reviewGenerator.js";
+import { RequestConfig } from "../types.js";
 
 const readJsonBody = async (req: IncomingMessage): Promise<RequestConfig> => {
   const chunks: Buffer[] = [];

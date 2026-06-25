@@ -1,6 +1,6 @@
 import { Plugin } from "vite";
-import { generateReviewResponseOnServer } from "./reviewGenerator";
-import { RequestConfig } from "../types";
+import { generateReviewResponseOnServer } from "./reviewGenerator.js";
+import { RequestConfig } from "../types.js";
 
 const readRequestBody = async (req: import("http").IncomingMessage) => {
   const chunks: Buffer[] = [];
