@@ -6,6 +6,14 @@ import { generateReviewResponse } from './geminiService';
 
 const MAX_IMAGE_SIZE_MB = 5;
 const MAX_IMAGE_SIZE_BYTES = MAX_IMAGE_SIZE_MB * 1024 * 1024;
+const MAX_IMAGE_DIMENSION = 1600;
+const COMPRESSED_IMAGE_TYPE = 'image/jpeg';
+const COMPRESSED_IMAGE_QUALITY = 0.82;
+
+type ImageCompressionInfo = {
+  originalSize: number;
+  compressedSize: number;
+};
 
 type RiskRule = {
   phrase: string;
@@ -42,6 +50,85 @@ const findRiskyPhrases = (text: string) => {
   });
 };
 
+const formatFileSize = (bytes: number) => {
+  if (bytes >= 1024 * 1024) {
+    return `${(bytes / 1024 / 1024).toFixed(1)}MB`;
+  }
+
+  return `${Math.max(1, Math.round(bytes / 1024))}KB`;
+};
+
+const readBlobAsDataUrl = (blob: Blob) => {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error('이미지를 읽지 못했습니다.'));
+    reader.readAsDataURL(blob);
+  });
+};
+
+const loadImageFromFile = (file: File) => {
+  return new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image();
+    const url = URL.createObjectURL(file);
+
+    image.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve(image);
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error('이미지 형식을 읽지 못했습니다.'));
+    };
+    image.src = url;
+  });
+};
+
+const canvasToBlob = (canvas: HTMLCanvasElement) => {
+  return new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => {
+        if (blob) {
+          resolve(blob);
+        } else {
+          reject(new Error('이미지 압축에 실패했습니다.'));
+        }
+      },
+      COMPRESSED_IMAGE_TYPE,
+      COMPRESSED_IMAGE_QUALITY
+    );
+  });
+};
+
+const compressImageFile = async (file: File) => {
+  const image = await loadImageFromFile(file);
+  const scale = Math.min(1, MAX_IMAGE_DIMENSION / Math.max(image.naturalWidth, image.naturalHeight));
+  const width = Math.max(1, Math.round(image.naturalWidth * scale));
+  const height = Math.max(1, Math.round(image.naturalHeight * scale));
+  const canvas = document.createElement('canvas');
+  const context = canvas.getContext('2d');
+
+  if (!context) {
+    throw new Error('이미지를 압축할 수 없습니다.');
+  }
+
+  canvas.width = width;
+  canvas.height = height;
+  context.fillStyle = '#ffffff';
+  context.fillRect(0, 0, width, height);
+  context.drawImage(image, 0, 0, width, height);
+
+  const compressedBlob = await canvasToBlob(canvas);
+  const dataUrl = await readBlobAsDataUrl(compressedBlob);
+
+  return {
+    dataUrl,
+    base64: dataUrl.split(',')[1],
+    mimeType: compressedBlob.type || COMPRESSED_IMAGE_TYPE,
+    compressedSize: compressedBlob.size,
+  };
+};
+
 export default function App() {
   const [hospitalName, setHospitalName] = useState(() => {
     return localStorage.getItem('hospital_name') || '';
@@ -54,6 +141,7 @@ export default function App() {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageData, setImageData] = useState<string | undefined>();
   const [imageMimeType, setImageMimeType] = useState<string | undefined>();
+  const [imageCompressionInfo, setImageCompressionInfo] = useState<ImageCompressionInfo | null>(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<GenerationResult | null>(null);
   const [copyStatus, setCopyStatus] = useState('복사하기');
@@ -63,25 +151,31 @@ export default function App() {
     localStorage.setItem('hospital_name', hospitalName);
   }, [hospitalName]);
 
-  const processFile = (file: File) => {
+  const processFile = async (file: File) => {
     if (!file.type.startsWith('image/')) {
       alert('이미지 파일만 첨부할 수 있습니다.');
       return;
     }
 
-    if (file.size > MAX_IMAGE_SIZE_BYTES) {
-      alert(`이미지는 ${MAX_IMAGE_SIZE_MB}MB 이하만 첨부할 수 있습니다.`);
-      return;
-    }
+    try {
+      const compressed = await compressImageFile(file);
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const fullBase64 = reader.result as string;
-      setImagePreview(fullBase64);
-      setImageData(fullBase64.split(',')[1]);
-      setImageMimeType(file.type);
-    };
-    reader.readAsDataURL(file);
+      if (compressed.compressedSize > MAX_IMAGE_SIZE_BYTES) {
+        alert(`자동 압축 후에도 이미지는 ${MAX_IMAGE_SIZE_MB}MB 이하만 첨부할 수 있습니다.`);
+        return;
+      }
+
+      setImagePreview(compressed.dataUrl);
+      setImageData(compressed.base64);
+      setImageMimeType(compressed.mimeType);
+      setImageCompressionInfo({
+        originalSize: file.size,
+        compressedSize: compressed.compressedSize,
+      });
+    } catch (error) {
+      console.error(error);
+      alert(error instanceof Error ? error.message : '이미지를 압축하지 못했습니다.');
+    }
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -111,6 +205,7 @@ export default function App() {
     setImagePreview(null);
     setImageData(undefined);
     setImageMimeType(undefined);
+    setImageCompressionInfo(null);
   };
 
   const handleGenerate = async () => {
@@ -283,6 +378,11 @@ export default function App() {
                 </div>
               </div>
               <p className="text-[11px] text-slate-400 text-center">이미지를 복사(Ctrl+C)한 후 위 입력창에 붙여넣기(Ctrl+V) 하셔도 첨부됩니다.</p>
+              {imageCompressionInfo && (
+                <p className="text-[11px] text-emerald-600 text-center font-bold">
+                  이미지 자동 압축 완료: {formatFileSize(imageCompressionInfo.originalSize)} → {formatFileSize(imageCompressionInfo.compressedSize)}
+                </p>
+              )}
             </div>
 
             <button
