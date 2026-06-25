@@ -47,6 +47,11 @@ export const generateReviewResponseOnServer = async (
     }
   }
 
+  console.log("[reviewGenerator] calling Gemini", {
+    model: "gemini-3-flash-preview",
+    hasImage: Boolean(config.imageData),
+  });
+
   const ai = new GoogleGenAI({ apiKey });
   const prompt = `
     당신은 병원의 고객 상담 전문가입니다. 고객의 리뷰에 대해 최적의 답변을 생성하세요.
@@ -97,6 +102,10 @@ export const generateReviewResponseOnServer = async (
         required: ["title", "body", "caution"],
       },
     },
+  });
+
+  console.log("[reviewGenerator] Gemini response received", {
+    hasText: Boolean(response.text),
   });
 
   let result: unknown;
